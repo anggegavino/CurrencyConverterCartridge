@@ -223,3 +223,15 @@ freeStyleJob("${folder_name}/Activity6") {
     }
 
 }
+buildPipelineView("Sample_Cartridge_Gavino") {
+    filterBuildQueue()
+    filterExecutors()
+    title('Cartridge Pipeline')
+    displayedBuilds(3)
+    selectedJob('act1')
+    alwaysAllowManualTrigger()
+    showPipelineParameters()
+    refreshFrequency(60)
+}
+ 
+
