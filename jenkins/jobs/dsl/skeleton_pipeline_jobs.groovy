@@ -1,134 +1,225 @@
+def folder_name = "cartridge_folder"
 
-// Folders
-//def workspaceFolderName = "${WORKSPACE_NAME}"
-def projectFolderName = "${PROJECT_NAME}"
+folder( "${folder_name}" ){}
 
-// Jobs
-def buildMavenJob = mavenJob(projectFolderName + "/Cartridge_Build_CurrencyConverter_Maven")
-def buildSonarJob = freeStyleJob(projectFolderName + "/Cartridge_Scan_CurrencyConverter_Sonarqube")
-def buildNexusSnapshotsJob = freeStyleJob(projectFolderName + "/Cartridge_CurrencyConverter_Nexus_Snapshots")
-def buildAnsibleJob = freeStyleJob(projectFolderName + "/Cartridge_Deploy_CurrencyConverter_Ansible")
-def buildSeleniumJob = freeStyleJob(projectFolderName + "/Cartridge_Test_CurrencyConverter_Selenium")
-def buildNexusReleasesJob = freeStyleJob(projectFolderName + "/Cartridge_CurrencyConverter_Nexus_Releases")
+freeStyleJob("${folder_name}/Activity1") {
 
-// Views
-def pipelineView = buildPipelineView(projectFolderName + "/Cartridge_CurrencyConverter_Pipeline")
-
-pipelineView.with{
-    title('Cartridge_CurrencyConverter_Pipeline')
-    displayedBuilds(10)
-    selectedJob(projectFolderName + "/Cartridge_Build_CurrencyConverter_Maven")
-    showPipelineParameters()
-    showPipelineDefinitionHeader()
-    refreshFrequency(5)
-}
-
-
-buildMavenJob.with{
-
-  properties {
-    copyArtifactPermissionProperty {
-      projectNames('Cartridge_CurrencyConverter_Nexus_Snapshot')
-    } 
-  }
-
-  scm {
-    git {           
-      remote {
-        credentials('adopteam2id')
-        url('http://gitlab/gitlab/CurrencyConverter/CurrencyConverter_Project.git')
+    // general
+    properties {
+        copyArtifactPermissionProperty {
+        projectNames('Activity3')
         }
-      branch('*/master')
+    }  
+
+    // source code management  
+    scm {
+        git {
+            remote {
+                url('http://52.53.40.250/gitlab/Gavino/CurrencyConverterDTS.git')
+                credentials('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+            }
+        }
     }
-  }
 
-  wrappers {
-    preBuildCleanup()
-  }
-
-  triggers {
-    gitlabPush {
-      buildOnMergeRequestEvents(true)
-      buildOnPushEvents(true)
-      enableCiSkip(true)
-      setBuildDescription(false)
-      rebuildOpenMergeRequest('never')
+    // build triggers
+     triggers {
+        gitlabPush {
+            buildOnMergeRequestEvents(true)
+            buildOnPushEvents(true)
+            enableCiSkip(false)
+            setBuildDescription(false)
+            rebuildOpenMergeRequest('never')
+        }
+    }
+    wrappers {
+        preBuildCleanup()
     }
   
-    goals('package')
-
-    publishers {
-      archiveArtifacts('**/*.war')
-      downstream('Cartridge_Scan_CurrencyConverter_Sonarqube','SUCCESS') 
+    // build
+    steps {
+        maven{
+            mavenInstallation('ADOP Maven')
+            goals('package')
+        }
     }
-  }
+
+    // post build actions
+     publishers {
+        archiveArtifacts {
+            pattern('**/*.war')
+            onlyIfSuccessful()
+        }
+        downstream('Activity2', 'SUCCESS')
+    }
 }
 
-buildSonarJob.with{
+freeStyleJob("${folder_name}/Activity2") {
+    // source code management  
+    scm {
+        git {
+            remote {
+                url('http://52.53.40.250/gitlab/Gavino/CurrencyConverterDTS.git')
+                credentials('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+            }
+        }
+    }
 
-  scm {
-    git {
-      remote {
-        credentials('adopteam2id')
-        url('http://gitlab/gitlab/CurrencyConverter/CurrencyConverter_Project.git')
-      }
-      branch('*/master')
-    }
-  }
-  
-  configure { project ->
-    project / 'builders' / 'hudson.plugins.sonar.SonarRunnerBuilder' {
-            properties('''sonar.projectKey=team2projkey
-            sonar.projectName=Currency_Converter
-            sonar.projectVersion=1
-            sonar.sources=.''')
-            javaOpts()
-            jdk('(Inherit From Job)')
-            task()
-    }
-  }
-  
+    // build
+    configure { project ->
+        project / 'builders' / 'hudson.plugins.sonar.SonarRunnerBuilder' {
+        properties('''
+            sonar.projectKey=SonarActivityTest
+            sonar.projectName=simulationActivity
+            sonar.projectVersion=1.0
+            sonar.sources=.
+        ''')
+        javaOpts()
+        jdk('(Inherit From Job)')
+        task()
+        }
+    }    
+
+  //post build actions
   publishers {
-    downstream('Cartridge_CurrencyConverter_Nexus_Snapshots','SUCCESS') 
-  }
+        downstream('Activity3', 'SUCCESS')
+    }
 
 }
-  
-buildNexusSnapshotsJob.with {
-  
-  properties {
-    copyArtifactPermissionProperty {
-      projectNames('Cartridge_CurrencyConverter_Nexus_Releases')
-    }
-  }
 
-  steps {
-    copyArtifacts('Cartridge_Build_CurrencyConverter_Maven') {
-      includePatterns('target/*.war')
-      buildSelector {
-        latestSuccessful(true)
-      }
-      fingerprintArtifacts(true)
-    }
-     
-    nexusArtifactUploader {
-      nexusVersion('nexus2')
-      protocol('HTTP')
-      nexusUrl('nexus:8081/nexus')
-      groupId('TeamTwoCurrencyConverter')
-      version('1')
-      repository('snapshots')
-      credentialsId('adopteam2id')
-      artifact {
-        artifactId('CurrencyConverter')
-        type('war')
-        file('target/CurrencyConverter.war')
+freeStyleJob("${folder_name}/Activity3") {
+
+  // build copy artifacts
+
+steps {
+      copyArtifacts('Activity1') {
+            includePatterns('target/*.war')
+            flatten()
+            optional()
+            buildSelector {
+                latestSuccessful(true)
+            }
+            fingerprintArtifacts()
+        }
+      nexusArtifactUploader {
+        nexusVersion('NEXUS2')
+        protocol('http')
+        nexusUrl('nexus:8081/nexus')
+        groupId('DTSActivity')
+        version('1')
+        repository('snapshots')
+        credentialsId('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+        artifact {
+            artifactId('CurrencyConverter')
+            type('war')
+            file('/var/jenkins_home/jobs/Activity3/workspace/target/CurrencyConverter.war')
+        }
       }
     }
-  }
+  
+  // post build actions
+     publishers {
+        archiveArtifacts {
+            pattern('**/*.war')
+            onlyIfSuccessful()
+        }
+        downstream('Activity4', 'UNSTABLE')
+    }
+}
 
-  publishers {
-    archiveArtifacts('**/*.war')
-    downstream('Cartridge_Deploy_CurrencyConverter_Ansible','SUCCESS') 
-  }
+freeStyleJob("${folder_name}/Activity4") {
+
+  // label
+  label('ansible')
+
+  // source code management  
+    scm {
+        git {
+            remote {
+                url('http://52.53.40.250/gitlab/Gavino/Ansible.git')
+                credentials('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+            }
+        }
+    }
+
+// build environment + bindings
+wrappers {
+        sshAgent('adop-jenkins-master')
+        credentialsBinding {
+            usernamePassword('username', 'password', 'credential')
+        }
+    }
+
+// build- execute shell
+
+steps {
+        shell('''ls -la
+                ansible-playbook -i hosts master.yml -u ec2-user -e "image_version=$BUILD_NUMBER username=$username password=$password"''')
+    }
+
+// post build actions
+publishers {
+        downstream('Activity5', 'SUCCESS')
+    }
+}
+
+freeStyleJob("${folder_name}/Activity5") {
+
+  // source code management  
+    scm {
+        git {
+            remote {
+                url('http://52.53.40.250/gitlab/Gavino/SeleniumDTS.git')
+                credentials('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+            }
+        }
+    }
+
+    // build
+    steps {
+        maven{
+            mavenInstallation('ADOP Maven')
+            goals('test')
+        }
+    }
+    // post build actions
+     publishers {
+        downstream('Activity6', 'SUCCESS')
+    }
+}
+
+freeStyleJob("${folder_name}/Activity6") {
+
+   // general
+    properties {
+        copyArtifactPermissionProperty {
+        projectNames('Activity3')
+        }
+    }  
+
+    // build
+    steps {
+        copyArtifacts('Activity3') {
+            includePatterns('**/*.war')
+            fingerprintArtifacts()
+            buildSelector {
+                latestSuccessful(true)
+            }
+        }
+            
+        nexusArtifactUploader {
+            nexusVersion('NEXUS2')
+            protocol('http')
+            nexusUrl('nexus:8081/nexus')
+            groupId('DTSActivity')
+            version('${BUILD_NUMBER}')
+            repository('releases')
+            credentialsId('bc8a5297-21cd-498f-98bf-4a7a5d17815b')
+            artifact {
+                artifactId('CurrencyConverter')
+                type('war')
+                file('target/CurrencyConverter.war')
+        }
+      }
+    }
+
 }
